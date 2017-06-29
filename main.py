@@ -20,7 +20,7 @@ WALKING_SPEED = 5
 FLYING_SPEED = 15
 
 GRAVITY = 20.0
-MAX_JUMP_HEIGHT = 1.0 # About the height of a block.
+MAX_JUMP_HEIGHT = 1.1 # About the height of a block.
 # To derive the formula for calculating jump speed, first solve
 #    v_t = v_0 + a * t
 # for the time at which you achieve maximum height, where a is the acceleration
@@ -74,12 +74,19 @@ def tex_coords(top, bottom, side):
     return result
 
 
-TEXTURE_PATH = 'texture.png'
+TEXTURE_PATH = 'assets/blocks.png'
 
 GRASS = tex_coords((1, 0), (0, 1), (0, 0))
 SAND = tex_coords((1, 1), (1, 1), (1, 1))
-BRICK = tex_coords((2, 0), (2, 0), (2, 0))
-STONE = tex_coords((2, 1), (2, 1), (2, 1))
+STONE = tex_coords((2, 0), (2, 0), (2, 0))
+BEDROCK = tex_coords((2, 1), (2, 1), (2, 1))
+DIRT = tex_coords((0, 1), (0, 1), (0, 1))
+COBBLESTONE = tex_coords((3, 0), (3, 0), (3, 0))
+WOOD = tex_coords((3, 1), (3, 1), (3, 1))
+LOG = tex_coords((3, 2), (3, 2), (2, 2))
+BRICK = tex_coords((1, 2), (1, 2), (1, 2))
+IRON_ORE = tex_coords((0, 2), (0, 2), (0, 2))
+WATER = tex_coords((0, 3), (0, 3), (0, 3))
 
 FACES = [
     ( 0, 1, 0),
@@ -164,24 +171,38 @@ class Model(object):
         y = 0  # initial y height
         for x in xrange(-n, n + 1, s):
             for z in xrange(-n, n + 1, s):
-                # create a layer stone an grass everywhere.
-                self.add_block((x, y - 2, z), GRASS, immediate=False)
-                self.add_block((x, y - 3, z), STONE, immediate=False)
+                # generate superflat-like terrain
+                self.add_block((x, y, z), GRASS, immediate=False)
+                self.add_block((x, y - 1, z), STONE, immediate=False)
+                self.add_block((x, y - 2, z), STONE, immediate=False)                
+                self.add_block((x, y - 3, z), BEDROCK, immediate=False)
                 if x in (-n, n) or z in (-n, n):
                     # create outer walls.
                     for dy in xrange(-2, 3):
-                        self.add_block((x, y + dy, z), STONE, immediate=False)
-
-        # generate the hills randomly
+                        self.add_block((x, y + dy, z), BEDROCK, immediate=False)
+        #add random ores
+        count = 0
+        while count < 256:
+            x = random.randint(-80, 80)
+            z = random.randint(-80, 80)
+            self.add_block((x, y - 1, z), IRON_ORE, immediate=False)
+            count = count + 1
+        count = 0
+        while count < 256:
+            x = random.randint(-80, 80)
+            z = random.randint(-80, 80)
+            self.add_block((x, y - 2, z), IRON_ORE, immediate=False)
+            count = count + 1
+        #generate the lakes
         o = n - 10
         for _ in xrange(120):
             a = random.randint(-o, o)  # x position of the hill
             b = random.randint(-o, o)  # z position of the hill
-            c = -1  # base of the hill
-            h = random.randint(1, 6)  # height of the hill
+            c = 0  # base of the hill
+            h = 1  # height of the hill
             s = random.randint(4, 8)  # 2 * s is the side length of the hill
             d = 1  # how quickly to taper off the hills
-            t = random.choice([GRASS, SAND, BRICK])
+            t = WATER
             for y in xrange(c, c + h):
                 for x in xrange(a - s, a + s + 1):
                     for z in xrange(b - s, b + s + 1):
@@ -191,6 +212,25 @@ class Model(object):
                             continue
                         self.add_block((x, y, z), t, immediate=False)
                 s -= d  # decrement side lenth so hills taper off
+        # generate the hills randomly
+        #o = n - 10
+        #for _ in xrange(120):
+        #    a = random.randint(-o, o)  # x position of the hill
+        #    b = random.randint(-o, o)  # z position of the hill
+        #    c = -1  # base of the hill
+        #    h = random.randint(1, 6)  # height of the hill
+        #    s = random.randint(4, 8)  # 2 * s is the side length of the hill
+        #    d = 1  # how quickly to taper off the hills
+        #    t = random.choice([GRASS, SAND, DIRT])
+        #    for y in xrange(c, c + h):
+        #        for x in xrange(a - s, a + s + 1):
+        #            for z in xrange(b - s, b + s + 1):
+        #                if (x - a) ** 2 + (z - b) ** 2 > (s + 1) ** 2:
+        #                    continue
+        #                if (x - 0) ** 2 + (z - 0) ** 2 < 5 ** 2:
+        #                    continue
+        #                self.add_block((x, y, z), t, immediate=False)
+        #        s -= d  # decrement side lenth so hills taper off
 
     def hit_test(self, position, vector, max_distance=8):
         """ Line of sight search from current position. If a block is
@@ -472,7 +512,7 @@ class Window(pyglet.window.Window):
         self.dy = 0
 
         # A list of blocks the player can place. Hit num keys to cycle.
-        self.inventory = [BRICK, GRASS, SAND]
+        self.inventory = [STONE, GRASS, SAND, BEDROCK, DIRT, COBBLESTONE, WOOD, LOG, BRICK]
 
         # The current block the user can place. Hit num keys to cycle.
         self.block = self.inventory[0]
@@ -487,7 +527,7 @@ class Window(pyglet.window.Window):
 
         # The label that is displayed in the top left of the canvas.
         self.label = pyglet.text.Label('', font_name='Arial', font_size=18,
-            x=10, y=self.height - 10, anchor_x='left', anchor_y='top',
+            x=10, y=self.height - 9.75, anchor_x='left', anchor_y='top',
             color=(0, 0, 0, 255))
 
         # This call schedules the `update()` method to be called
@@ -630,7 +670,7 @@ class Window(pyglet.window.Window):
         # have to count as a collision. If 0, touching terrain at all counts as
         # a collision. If .49, you sink into the ground, as if walking through
         # tall grass. If >= .5, you'll fall through the ground.
-        pad = 0.25
+        pad = 0
         p = list(position)
         np = normalize(position)
         for face in FACES:  # check all surrounding blocks
@@ -682,7 +722,7 @@ class Window(pyglet.window.Window):
                     self.model.add_block(previous, self.block)
             elif button == pyglet.window.mouse.LEFT and block:
                 texture = self.model.world[block]
-                if texture != STONE:
+                if texture != BEDROCK:
                     self.model.remove_block(block)
         else:
             self.set_exclusive_mouse(True)
@@ -731,8 +771,10 @@ class Window(pyglet.window.Window):
                 self.dy = JUMP_SPEED
         elif symbol == key.ESCAPE:
             self.set_exclusive_mouse(False)
-        elif symbol == key.TAB:
+        elif symbol == key.F:
             self.flying = not self.flying
+        elif symbol == key.Q:
+            exit()
         elif symbol in self.num_keys:
             index = (symbol - self.num_keys[0]) % len(self.inventory)
             self.block = self.inventory[index]
